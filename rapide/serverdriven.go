@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"io"
 	mrand "math/rand"
+	"os"
+	"sync"
 
 	"github.com/ipfs/go-cid"
 	"github.com/ipfs/go-libipfs/blocks"
@@ -21,6 +23,15 @@ type serverDrivenWorker struct {
 	rand     mrand.Rand
 
 	// TODO: add a dontGoThere map which tells you what part of the dag this node is not able to handle
+}
+
+var talkLock sync.Mutex
+
+func Println(a ...any) {
+	msg := fmt.Sprintln(a...)
+	talkLock.Lock()
+	os.Stderr.WriteString(msg)
+	talkLock.Unlock()
 }
 
 func (d *download) startServerDrivenWorker(ctx context.Context, impl ServerDrivenDownloader, root *node, outErr *error, seed int64) {
@@ -40,10 +51,13 @@ func (w *serverDrivenWorker) work(ctx context.Context) {
 	for {
 		workCid, traversal, ok := w.findWork()
 		if !ok {
+			Println(w.impl, "has no more work")
 			w.resetAllCurrentNodesWorkState()
 			w.download.workerFinished()
 			return // finished
 		}
+
+		Println(w.impl, "selected", workCid)
 
 		tasks := w.tasks
 		for k := range tasks {
@@ -57,6 +71,7 @@ func (w *serverDrivenWorker) work(ctx context.Context) {
 			w.resetCurrentChildsNodeWorkState()
 			continue
 		default:
+			Println(w.impl, err)
 			// FIXME: support ignoring erroring parts of the tree when searching (dontGoThere)
 			// If the error is that some blocks are not available, we should backtrack and find more work.
 			w.resetAllCurrentNodesWorkState()
@@ -115,6 +130,7 @@ func (w *serverDrivenWorker) doOneDownload(ctx context.Context, workCid cid.Cid,
 		if task.state == done {
 			task.mu.Unlock()
 			// we finished all parts of our tree, cancel current work and restart a new request.
+			Println(w.impl, errGotDoneBlock)
 			return errGotDoneBlock
 		}
 		if err := task.expand(w.download, b); err != nil {

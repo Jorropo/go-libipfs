@@ -20,6 +20,8 @@ var _ rapide.ServerDrivenDownloader = Gateway{}
 // Gateway allows to download car files from a gateway with the [rapide.ServerDriven] interface.
 // It does not implement any traversal validation logic, and relies on the consumer (rapide) to care of this.
 type Gateway struct {
+	Name string
+
 	// PathName must be like: "https://example.org/ipfs/"
 	PathName string
 
@@ -28,7 +30,7 @@ type Gateway struct {
 }
 
 func (g Gateway) String() string {
-	return g.PathName
+	return g.Name
 }
 
 func (g Gateway) Download(ctx context.Context, root cid.Cid, traversal ipsl.Traversal) (rapide.ClosableBlockIterator, error) {
